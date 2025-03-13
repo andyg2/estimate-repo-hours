@@ -43,6 +43,7 @@ function analyzeCommitMessage($message) {
 }
 
 function estimateManHours($repoUrl, $developerExperience = 'mid') {
+
   $tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'repo_' . uniqid();
   mkdir($tempDir);
 
@@ -51,14 +52,14 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
     $command = "git clone --bare $repoUrl \"$tempDir\" 2>&1";
     exec($command, $output, $returnVar);
     if ($returnVar !== 0) {
-      throw new Exception("Failed to clone repository: " . implode("\n", $output));
+      throw new Exception("Failed to clone repository: " . implode(PHP_EOL, $output));
     }
 
     // Get git log with commit hash, date, and stats
     $command = "cd /d \"$tempDir\" && git log --pretty=format:\"%H|%ad|%s\" --date=iso --numstat 2>&1";
     exec($command, $logLines, $returnVar);
     if ($returnVar !== 0) {
-      throw new Exception("Failed to get git log: " . implode("\n", $logLines));
+      throw new Exception("Failed to get git log: " . implode(PHP_EOL, $logLines));
     }
 
     $totalManHours = 0;
@@ -69,7 +70,7 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
     $totalLinesDeleted = 0;
     $totalWeightedChanges = 0;
 
-    echo str_pad("Commit Hash", 40) . " | " .
+    lecho(str_pad("Commit Hash", 40) . " | " .
       str_pad("Timestamp", 20) . " | " .
       str_pad("Lines Added", 12) . " | " .
       str_pad("Lines Deleted", 12) . " | " .
@@ -77,8 +78,8 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
       str_pad("Weighted Changes", 16) . " | " .
       str_pad("Message Analysis", 16) . " | " .
       str_pad("Adjusted Time (H)", 16) . " | " .
-      str_pad("Cumulative Total (H)", 16) . "\n";
-    echo str_repeat("-", 160) . "\n";
+      str_pad("Cumulative Total (H)", 16));
+    lecho(str_repeat("-", 160));
 
     foreach ($logLines as $line) {
       $weight = 1.0;
@@ -150,7 +151,7 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
         $totalManHours += $weightedTime;
 
         // Output commit statistics
-        echo str_pad(substr($commitInfo['hash'], 0, 7), 40) . " | " .
+        lecho(str_pad(substr($commitInfo['hash'], 0, 7), 40) . " | " .
           str_pad(date('Y-m-d H:i:s', $commitInfo['timestamp']), 20) . " | " .
           str_pad($commitInfo['linesAdded'], 12) . " | " .
           str_pad($commitInfo['linesDeleted'], 13) . " | " .
@@ -158,15 +159,15 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
           str_pad(number_format($commitInfo['weightedChanges'], 2), 16) . " | " .
           str_pad(number_format($messageMultiplier, 2), 16) . " | " .
           str_pad(number_format($weightedTime, 2), 16) . " | " .
-          str_pad(number_format($totalManHours, 2), 16) . "\n";
+          str_pad(number_format($totalManHours, 2), 16));
 
         // Output file details for the commit
         foreach ($commitInfo['files'] as $file) {
-          echo "  -> " . str_pad($file['filename'], 58) . " | " .
+          lecho("  -> " . str_pad($file['filename'], 58) . " | " .
             str_pad($file['additions'], 12) . " | " .
             str_pad($file['deletions'], 13) . " | " .
             str_pad(number_format($file['weight'], 2), 12) . " | " .
-            str_pad(number_format($file['weightedChanges'], 2), 16) . "\n";
+            str_pad(number_format($file['weightedChanges'], 2), 16));
         }
 
         // $previousTimestamp = $commitInfo['timestamp'];
@@ -175,13 +176,13 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
     }
 
     // Output summary statistics
-    echo "\nSummary Statistics:\n";
-    echo str_repeat("-", 40) . "\n";
-    echo "Total Commits: " . $totalCommits . "\n";
-    echo "Total Lines Added: " . $totalLinesAdded . "\n";
-    echo "Total Lines Deleted: " . $totalLinesDeleted . "\n";
-    echo "Total Weighted Changes: " . number_format($totalWeightedChanges, 2) . "\n";
-    echo "Total Estimated Man-Hours: " . number_format($totalManHours, 2) . "\n";
+    lecho("\nSummary Statistics:");
+    lecho(str_repeat("-", 40));
+    lecho("Total Commits: " . $totalCommits);
+    lecho("Total Lines Added: " . $totalLinesAdded);
+    lecho("Total Lines Deleted: " . $totalLinesDeleted);
+    lecho("Total Weighted Changes: " . number_format($totalWeightedChanges, 2));
+    lecho("Total Estimated Man-Hours: " . number_format($totalManHours, 2));
 
     return round($totalManHours, 3);
   } finally {
@@ -192,11 +193,20 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
 }
 
 // Usage example
-$repoUrl = 'https://github.com/andyg2/recamera-sscma-node-protocol-mqtt';
+$repoUrl = 'https://github.com/andyg2/ant_simulation';
+define('LOG_FILE', './logs/' . basename($repoUrl) . '.log');
+if (file_exists(LOG_FILE)) {
+  unlink(LOG_FILE);
+}
 $developerExperience = 'junior'; // Options: 'junior', 'mid', 'senior'
 try {
   $manHours = estimateManHours($repoUrl, $developerExperience);
-  echo "Estimated man hours: $manHours\n";
+  lecho("Estimated man hours: $manHours");
 } catch (Exception $e) {
-  echo "Error: " . $e->getMessage() . "\n";
+  lecho("Error: " . $e->getMessage());
+}
+echo file_get_contents(LOG_FILE);
+
+function lecho($message) {
+  file_put_contents(LOG_FILE, $message . PHP_EOL, FILE_APPEND);
 }
