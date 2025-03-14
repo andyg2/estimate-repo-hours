@@ -1,21 +1,35 @@
 <?php
+// Parse CLI arguments
+if ($argc < 2) {
+  echo "Usage: php run-estimate.php <repository-url> [developer-experience]\n";
+  echo "  <repository-url>: The URL of the Git repository to analyze.\n";
+  echo "  [developer-experience]: Optional. Developer experience level ('junior', 'mid', 'senior'). Defaults to 'mid'.\n";
+  echo "Example: php run-estimate.php https://github.com/andyg2/estimate-repo-hours mid\n";
+  exit(1);
+}
 
+$repoUrl = $argv[1]; // First argument is the repository URL
+$developerExperience = $argv[2] ?? 'mid'; // Second argument is optional (default: 'mid')
+
+// Validate developer experience
+if (!in_array($developerExperience, ['junior', 'mid', 'senior'])) {
+  echo "Error: Invalid developer experience level. Must be 'junior', 'mid', or 'senior'.\n";
+  exit(1);
+}
+
+// Logging setup
 define('LOG_DIR', './logs/');
 if (!is_dir(LOG_DIR)) {
   mkdir(LOG_DIR, 0644, true);
 }
-$repoUrl = 'https://github.com/andyg2/estimate-repo-hours';
-
 
 define('LOG_FILE', LOG_DIR . basename($repoUrl) . '.log');
 if (file_exists(LOG_FILE)) {
   unlink(LOG_FILE);
 }
 
-$developerExperience = 'mid'; // Options: 'junior', 'mid', 'senior'
 try {
   $manHours = estimateManHours($repoUrl, $developerExperience);
-  elog("Estimated man hours: $manHours");
 } catch (Exception $e) {
   elog("Error: " . $e->getMessage());
 }
@@ -123,23 +137,24 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
     }
 
     $totalManHours = 0;
-    $previousTimestamp = null;
     $commitInfo = [];
     $totalCommits = 0;
     $totalLinesAdded = 0;
     $totalLinesDeleted = 0;
     $totalWeightedChanges = 0;
 
-    elog(str_pad("Commit Hash", 40) . " | " .
-      str_pad("Timestamp", 20) . " | " .
-      str_pad("Lines Added", 12) . " | " .
-      str_pad("Lines Deleted", 12) . " | " .
+    elog(str_pad('Repository: ' . $repoUrl, 148));
+    elog(str_repeat("-", 148));
+    elog(str_pad("Commit Hash -> File", 24) . " | " .
+      str_pad("Timestamp", 16) . " | " .
+      str_pad("Lines++", 7) . " | " .
+      str_pad("Lines--", 7) . " | " .
       str_pad("File Weight", 12) . " | " .
       str_pad("Weighted Changes", 16) . " | " .
       str_pad("Message Analysis", 16) . " | " .
-      str_pad("Adjusted Time (H)", 16) . " | " .
-      str_pad("Cumulative Total (H)", 16));
-    elog(str_repeat("-", 160));
+      str_pad("Adjusted Hrs", 11) . " | " .
+      str_pad("Cumulative Hrs", 10));
+    elog(str_repeat("-", 148));
 
     foreach ($logLines as $line) {
       $weight = 1.0;
@@ -211,23 +226,23 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
         $totalManHours += $weightedTime;
 
         // Output commit statistics
-        elog(str_pad(substr($commitInfo['hash'], 0, 7), 40) . " | " .
-          str_pad(date('Y-m-d H:i:s', $commitInfo['timestamp']), 20) . " | " .
-          str_pad($commitInfo['linesAdded'], 12) . " | " .
-          str_pad($commitInfo['linesDeleted'], 13) . " | " .
-          str_pad(number_format($weight, 2), 12) . " | " .
-          str_pad(number_format($commitInfo['weightedChanges'], 2), 16) . " | " .
-          str_pad(number_format($messageMultiplier, 2), 16) . " | " .
-          str_pad(number_format($weightedTime, 2), 16) . " | " .
-          str_pad(number_format($totalManHours, 2), 16));
+        elog(str_pad(substr($commitInfo['hash'], 0, 7), 24) . " | " .
+          str_pad(date('Y-m-d H:i', $commitInfo['timestamp']), 16) . " | " .
+          str_pad($commitInfo['linesAdded'], 7) . " | " .
+          str_pad($commitInfo['linesDeleted'], 7) . " | " .
+          str_pad(number_format($weight, 1), 12) . " | " .
+          str_pad(number_format($commitInfo['weightedChanges'], 1), 16) . " | " .
+          str_pad(number_format($messageMultiplier, 1), 16) . " | " .
+          str_pad(number_format($weightedTime, 1), 12) . " | " .
+          number_format($totalManHours, 1));
 
         // Output file details for the commit
         foreach ($commitInfo['files'] as $file) {
-          elog("  -> " . str_pad($file['filename'], 58) . " | " .
-            str_pad($file['additions'], 12) . " | " .
-            str_pad($file['deletions'], 13) . " | " .
-            str_pad(number_format($file['weight'], 2), 12) . " | " .
-            str_pad(number_format($file['weightedChanges'], 2), 16));
+          elog("-> " . str_pad(substr($file['filename'], 0, 37), 40) . " | " .
+            str_pad($file['additions'], 7) . " | " .
+            str_pad($file['deletions'], 7) . " | " .
+            str_pad(number_format($file['weight'], 1), 12) . " | " .
+            number_format($file['weightedChanges'], 1));
         }
 
         // $previousTimestamp = $commitInfo['timestamp'];
@@ -237,12 +252,12 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
 
     // Output summary statistics
     elog("\nSummary Statistics:");
-    elog(str_repeat("-", 40));
+    elog(str_repeat("-", 35));
     elog("Total Commits: " . $totalCommits);
     elog("Total Lines Added: " . $totalLinesAdded);
     elog("Total Lines Deleted: " . $totalLinesDeleted);
-    elog("Total Weighted Changes: " . number_format($totalWeightedChanges, 2));
-    elog("Total Estimated Man-Hours: " . number_format($totalManHours, 2));
+    elog("Total Weighted Changes: " . number_format($totalWeightedChanges, 1));
+    elog("Total Estimated Man-Hours: " . number_format($totalManHours, 1));
 
     return round($totalManHours, 3);
   } finally {
