@@ -1,5 +1,38 @@
 <?php
 
+define('LOG_DIR', './logs/');
+if (!is_dir(LOG_DIR)) {
+  mkdir(LOG_DIR, 0644, true);
+}
+$repoUrl = 'https://github.com/andyg2/estimate-repo-hours';
+
+
+define('LOG_FILE', LOG_DIR . basename($repoUrl) . '.log');
+if (file_exists(LOG_FILE)) {
+  unlink(LOG_FILE);
+}
+
+$developerExperience = 'mid'; // Options: 'junior', 'mid', 'senior'
+try {
+  $manHours = estimateManHours($repoUrl, $developerExperience);
+  elog("Estimated man hours: $manHours");
+} catch (Exception $e) {
+  elog("Error: " . $e->getMessage());
+}
+echo file_get_contents(LOG_FILE);
+
+
+
+// Helper functions
+
+/**
+ * Returns a weight for the given filename based on the language it is written in.
+ * The weights are used to adjust the man hours calculation based on the complexity
+ * of the language.
+ *
+ * @param string $filename The name of the file
+ * @return float The weight for the language
+ */
 function getLanguageWeight($filename) {
   $weights = [
     'html' => 0.5,
@@ -32,6 +65,20 @@ function getLanguageWeight($filename) {
   return isset($weights[$extension]) ? $weights[$extension] : 1.0;
 }
 
+/**
+ * Analyzes a commit message to determine the time multiplier based on its content.
+ * 
+ * This function returns a multiplier that can be used to adjust the estimated
+ * man hours required for a task, based on keywords in the commit message.
+ * 
+ * - Returns 0.8 if the message contains 'fix' or 'bug', indicating bug fixes.
+ * - Returns 1.3 if the message contains 'refactor', indicating refactoring tasks.
+ * - Returns 1.0 for all other messages, indicating a standard task.
+ * 
+ * @param string $message The commit message to analyze.
+ * @return float The time multiplier based on the commit message.
+ */
+
 function analyzeCommitMessage($message) {
   $message = strtolower($message);
   if (strpos($message, 'fix') !== false || strpos($message, 'bug') !== false) {
@@ -41,6 +88,19 @@ function analyzeCommitMessage($message) {
   }
   return 1.0; // Default multiplier
 }
+
+/**
+ * Estimates the man-hours required for a given repository based on commit history and developer experience level.
+ *
+ * This function clones a Git repository, analyzes its commit history, and calculates the estimated man-hours
+ * required to develop the codebase. It considers the number of lines added/deleted, the complexity of the code
+ * based on file types, and adjustments for commit types and developer experience.
+ *
+ * @param string $repoUrl The URL of the Git repository to analyze.
+ * @param string $developerExperience The experience level of the developer ('junior', 'mid', 'senior').
+ * @return float The estimated man-hours required, rounded to three decimal places.
+ * @throws Exception If the repository cannot be cloned or the commit log cannot be retrieved.
+ */
 
 function estimateManHours($repoUrl, $developerExperience = 'mid') {
 
@@ -70,7 +130,7 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
     $totalLinesDeleted = 0;
     $totalWeightedChanges = 0;
 
-    lecho(str_pad("Commit Hash", 40) . " | " .
+    elog(str_pad("Commit Hash", 40) . " | " .
       str_pad("Timestamp", 20) . " | " .
       str_pad("Lines Added", 12) . " | " .
       str_pad("Lines Deleted", 12) . " | " .
@@ -79,7 +139,7 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
       str_pad("Message Analysis", 16) . " | " .
       str_pad("Adjusted Time (H)", 16) . " | " .
       str_pad("Cumulative Total (H)", 16));
-    lecho(str_repeat("-", 160));
+    elog(str_repeat("-", 160));
 
     foreach ($logLines as $line) {
       $weight = 1.0;
@@ -151,7 +211,7 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
         $totalManHours += $weightedTime;
 
         // Output commit statistics
-        lecho(str_pad(substr($commitInfo['hash'], 0, 7), 40) . " | " .
+        elog(str_pad(substr($commitInfo['hash'], 0, 7), 40) . " | " .
           str_pad(date('Y-m-d H:i:s', $commitInfo['timestamp']), 20) . " | " .
           str_pad($commitInfo['linesAdded'], 12) . " | " .
           str_pad($commitInfo['linesDeleted'], 13) . " | " .
@@ -163,7 +223,7 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
 
         // Output file details for the commit
         foreach ($commitInfo['files'] as $file) {
-          lecho("  -> " . str_pad($file['filename'], 58) . " | " .
+          elog("  -> " . str_pad($file['filename'], 58) . " | " .
             str_pad($file['additions'], 12) . " | " .
             str_pad($file['deletions'], 13) . " | " .
             str_pad(number_format($file['weight'], 2), 12) . " | " .
@@ -176,13 +236,13 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
     }
 
     // Output summary statistics
-    lecho("\nSummary Statistics:");
-    lecho(str_repeat("-", 40));
-    lecho("Total Commits: " . $totalCommits);
-    lecho("Total Lines Added: " . $totalLinesAdded);
-    lecho("Total Lines Deleted: " . $totalLinesDeleted);
-    lecho("Total Weighted Changes: " . number_format($totalWeightedChanges, 2));
-    lecho("Total Estimated Man-Hours: " . number_format($totalManHours, 2));
+    elog("\nSummary Statistics:");
+    elog(str_repeat("-", 40));
+    elog("Total Commits: " . $totalCommits);
+    elog("Total Lines Added: " . $totalLinesAdded);
+    elog("Total Lines Deleted: " . $totalLinesDeleted);
+    elog("Total Weighted Changes: " . number_format($totalWeightedChanges, 2));
+    elog("Total Estimated Man-Hours: " . number_format($totalManHours, 2));
 
     return round($totalManHours, 3);
   } finally {
@@ -192,21 +252,16 @@ function estimateManHours($repoUrl, $developerExperience = 'mid') {
   }
 }
 
-// Usage example
-$repoUrl = 'https://github.com/andyg2/ant_simulation';
-define('LOG_FILE', './logs/' . basename($repoUrl) . '.log');
-if (file_exists(LOG_FILE)) {
-  unlink(LOG_FILE);
-}
-$developerExperience = 'junior'; // Options: 'junior', 'mid', 'senior'
-try {
-  $manHours = estimateManHours($repoUrl, $developerExperience);
-  lecho("Estimated man hours: $manHours");
-} catch (Exception $e) {
-  lecho("Error: " . $e->getMessage());
-}
-echo file_get_contents(LOG_FILE);
 
-function lecho($message) {
+/**
+ * Logs a message to the specified log file.
+ *
+ * This function appends a given message to the log file defined by LOG_FILE.
+ * Each message is followed by a newline character.
+ *
+ * @param string $message The message to be logged.
+ */
+
+function elog($message) {
   file_put_contents(LOG_FILE, $message . PHP_EOL, FILE_APPEND);
 }
