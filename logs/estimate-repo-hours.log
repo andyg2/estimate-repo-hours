@@ -1,0 +1,18 @@
+Repository: https://github.com/andyg2/estimate-repo-hours                                                                                           
+----------------------------------------------------------------------------------------------------------------------------------------------------
+Commit Hash -> File      | Timestamp        | Lines++ | Lines-- | File Weight  | Weighted Changes | Message Analysis | Adjusted Hrs | Cumulative Hrs
+----------------------------------------------------------------------------------------------------------------------------------------------------
+498df9b                  | 2025-03-14 04:12 | 81      | 26      | 1.0          | 128.4            | 1.0              | 2.1          | 2.1
+-> run-estimate.php                         | 81      | 26      | 1.2          | 128.4
+f28b1f1                  | 2025-03-13 13:55 | 30      | 19      | 1.0          | 58.6             | 1.0              | 1.0          | 3.1
+-> .gitignore                               | 1       | 0       | 1.0          | 1.0
+-> logs/.gitkeep                            | 0       | 0       | 1.0          | 0.0
+-> run-estimate.php                         | 29      | 19      | 1.2          | 57.6
+
+Summary Statistics:
+-----------------------------------
+Total Commits: 3
+Total Lines Added: 313
+Total Lines Deleted: 45
+Total Weighted Changes: 429.4
+Total Estimated Man-Hours: 3.1
